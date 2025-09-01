@@ -3,8 +3,8 @@ from dotenv import load_dotenv
 from langchain.document_loaders import TextLoader #Permite carregar dados a partir de um arquivo de texto
 from langchain.document_loaders.csv_loader import CSVLoader #Permite carregar dados a partir de um arquivo de XLSX
 from langchain.document_loaders import UnstructuredURLLoader #Carrega text de uma pagina a partir de uma URL
-from langchain.text_splitter CharacterTextSplitter #Separa os caracteres de um texto em Arrays de X Caracteres de acordo com um separador
-from langchain.text_splitter RecursiveCharacterTextSplitter #Separa os caracteres de um texto em Arrays de X Caracteres de forma recursiva de acordo com X separadores
+from langchain.text_splitter import CharacterTextSplitter #Separa os caracteres de um texto em Arrays de X Caracteres de acordo com um separador
+from langchain.text_splitter import RecursiveCharacterTextSplitter #Separa os caracteres de um texto em Arrays de X Caracteres de forma recursiva de acordo com X separadores
 
 load_dotenv()
 TEXT_FILE_LOCATION = os.getenv("TEXT_FILE_LOCATION")
