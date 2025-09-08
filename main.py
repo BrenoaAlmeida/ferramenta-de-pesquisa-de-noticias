@@ -1,63 +1,81 @@
 import os
+import streamlit as st
+from langchain_aws import ChatBedrock, BedrockEmbeddings
+from langchain.chains.qa_with_sources.retrieval import RetrievalQAWithSourcesChain
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.document_loaders import UnstructuredURLLoader
+from langchain_community.vectorstores import FAISS
 from dotenv import load_dotenv
-from langchain.document_loaders import TextLoader #Permite carregar dados a partir de um arquivo de texto
-from langchain.document_loaders.csv_loader import CSVLoader #Permite carregar dados a partir de um arquivo de XLSX
-from langchain.document_loaders import UnstructuredURLLoader #Carrega text de uma pagina a partir de uma URL
-from langchain.text_splitter import CharacterTextSplitter #Separa os caracteres de um texto em Arrays de X Caracteres de acordo com um separador
-from langchain.text_splitter import RecursiveCharacterTextSplitter #Separa os caracteres de um texto em Arrays de X Caracteres de forma recursiva de acordo com X separadores
 
 load_dotenv()
-TEXT_FILE_LOCATION = os.getenv("TEXT_FILE_LOCATION")
-CSV_FILE_LOCATION = os.getenv("CSV_FILE_LOCATION")
 
-#TODO: IMPLEMENTAR Conversão de Texto para EMBEDDING
-SENTENCE_TRANSFORMER = os.getenv("SENTENCE_TRANSFORMER")
+MODEL_ID = os.getenv("AWS_MODEL")
+EMBEDDINGS_MODEL_ID = os.getenv("EMBEDDINGS_MODEL_ID")
 
-def TextLoad():
-    loader = TextLoader(TEXT_FILE_LOCATION)
+llm = ChatBedrock(
+    model_id=MODEL_ID,
+    model_kwargs={
+        "max_tokens": 512,
+        "temperature": 0.7,
+        "top_p": 0.9,
+    },
+)
+
+st.title("Ferramenta de Pesquisa de Notícias")
+st.sidebar.title("URLs do artigo")
+
+urls = [st.sidebar.text_input(f"URL {i+1}") for i in range(3)]
+process_url_clicked = st.sidebar.button("Processar URLs")
+status = st.empty()
+
+file_path = "faiss_index"
+
+if process_url_clicked:
+    loader = UnstructuredURLLoader(urls=[u for u in urls if u.strip()])
     data = loader.load()
-    print(data[0].metadata, data[0].page_content)
+    status.text("(1/5) Carregando dados...")
 
-def CsvLoad():
-    loader = CSVLoader(CSV_FILE_LOCATION, source_column="title")
-    data = loader.load()
-    print(data[0].metadata, data[0].page_content)
-
-def UrlLoader():
-    loader = UnstructuredURLLoader(urls=[
-        "https://edition.cnn.com/2025/08/01/investing/us-stock-market",
-        "https://edition.cnn.com/2025/07/11/investing/us-stock-market"
-    ])
-    data = loader.load()
-    print(data[0])
-    print(data[0].metadata)
-
-def CharacterTextSplitter():
-    splitter = CharacterTextSplitter(
-        separator="\n",
-        chunk_size=200,
-        chunk_overlap=0
-    )
-
-    chunks = splitter.split(TEXT_FILE_LOCATION);
-    print(chunks)
-
-    for chunk in chunks:
-        print(len(chunk))
-
-def RecursiveCharacterTextSplitter():
-    splitter = RecursiveCharacterTextSplitter(
+    text_splitter = RecursiveCharacterTextSplitter(
         separators=["\n\n", "\n", " ", "."],
-        chunk_size=200,
-        chunk_overlap=0
+        chunk_size=1000,
     )
+    docs = text_splitter.split_documents(data)
+    status.text("(2/5) Separando em chunks...")
 
-    chunks = splitter.split(TEXT_FILE_LOCATION);
-    print(chunks)
+    embeddings = BedrockEmbeddings(model_id=EMBEDDINGS_MODEL_ID)
 
-    for chunk in chunks:
-        print(len(chunk))
+    vector_store = FAISS.from_documents(docs, embeddings)
+    status.text("(3/5) Gerando embeddings...")
 
+    vector_store.save_local(file_path)
+    status.success("(4/5) FAISS salvo com sucesso!")
 
-if __name__ == "__main__":
-    TextLoad()
+query = st.text_input("Pergunta:")
+
+if query.strip():
+    if os.path.exists(file_path):
+        status.text("(5/5) Carregando FAISS...")
+        embeddings = BedrockEmbeddings(model_id=EMBEDDINGS_MODEL_ID)
+        vector_store = FAISS.load_local(
+            file_path, embeddings, allow_dangerous_deserialization=True
+        )
+
+        chain = RetrievalQAWithSourcesChain.from_llm(
+            llm=llm, retriever=vector_store.as_retriever()
+        )
+
+        with st.spinner("Respondendo pergunta..."):
+            result = chain({"question": query}, return_only_outputs=True)
+
+        st.header("Resposta:")
+        st.write(result["answer"])
+
+        sources = result.get("sources", "")
+        if sources:
+            st.subheader("Fontes:")
+            for source in sources.split("\n"):
+                st.write(source)
+
+        status.empty()
+    else:
+        st.warning("Nenhum índice encontrado. Clique em 'Processar URLs'.")

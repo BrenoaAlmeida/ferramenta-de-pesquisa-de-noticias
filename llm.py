@@ -2,6 +2,7 @@ from copyreg import pickle
 import os
 import streamlit as st
 import pickle
+from dotenv import load_dotenv
 import time
 import langchain
 from langchain import OpenAi
@@ -12,16 +13,12 @@ from langchain.document_loaders import UnstructuredURLLoader #Carrega text de um
 from langchain.embeddings import OpenAiEmbeddings
 from langchain.vectorstores import FAISS
 
-from dotenv import load_dotenv
-from langchain.text_splitter import CharacterTextSplitter #Separa os caracteres de um texto em Arrays de X Caracteres de acordo com um separador
-
-
-api_key = os.environ["API_KEY"]
+load_dotenv()
 
 llm = OpenAi(temperature=0, max_tokens=500)
 
 loader = UnstructuredURLLoader(urls=[
-        "https://edition.cnn.com/2025/08/01/investing/us-stock-market",
+    "https://edition.cnn.com/2025/08/01/investing/us-stock-market",
     "https://edition.cnn.com/2025/07/11/investing/us-stock-market"
 ])
 
@@ -38,7 +35,7 @@ len(chunks)
 
 embedings = OpenAiEmbeddings()
 
-#FAISS é uma ferramente de embedding de vetores
+#FAISS é uma ferramenta de embedding de vetores
 vector_index = FAISS.from_documents(chunks, embedings)
 
 file_path = "vector_index.pkl"
