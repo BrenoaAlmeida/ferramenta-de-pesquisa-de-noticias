@@ -1,7 +1,13 @@
 langchain
+python-dotenv
+streamlit
 unstructured
+tiktoken
+faiss-cpu
 libmagic
 python-magic
-python-magic-bin
-faiss-cpu
-sentence-transformers
+OpenAi
+langchain_openai
+langchain_community
+langchain_aws
+transformers
